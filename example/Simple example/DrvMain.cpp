@@ -14,7 +14,9 @@ void DriverUnload(_In_ PDRIVER_OBJECT DriverObj)
 SVM::PRIVATE_VM_DATA* Interceptions(
 	_Inout_ SVM::PRIVATE_VM_DATA* Private)
 {
+	Private->Guest.ControlArea.InterceptCpuid = TRUE;
 	Private->Guest.ControlArea.InterceptVmrun = TRUE;
+	//Private->Guest.ControlArea.InterceptExceptions.Bitmap.InterceptionVectorDB = TRUE;
 	Private->Guest.ControlArea.InterceptMsr = TRUE;
 	Private->Guest.ControlArea.MsrpmBasePa = reinterpret_cast<UINT64>(PhysicalMemory::GetPhysicalAddress(&Private->Msrpm));
 
@@ -46,6 +48,23 @@ extern "C" SVM::VMM_STATUS SvmVmexitHandler(
 	
 	switch (Private->Guest.ControlArea.ExitCode)
 	{
+	case SVM::SVM_EXIT_CODE::VMEXIT_CPUID:
+	{
+		CPUID_REGS Regs = {};
+		int Function = static_cast<int>(Context->Rax);
+		int SubLeaf = static_cast<int>(Context->Rcx);
+		__cpuidex(Regs.Raw, Function, SubLeaf);
+
+		if (Function == CPUID_VMM_SHUTDOWN) { Status = SVM::VMM_STATUS::VMM_SHUTDOWN; }
+		else 
+		{
+			Context->Rax = Regs.Regs.Eax;
+			Context->Rbx = Regs.Regs.Ebx;
+			Context->Rcx = Regs.Regs.Ecx;
+			Context->Rdx = Regs.Regs.Edx;
+		}
+		break;
+	}
 	case SVM::SVM_EXIT_CODE::VMEXIT_MSR:
 	{
 		if ((Context->Rcx & MAXUINT32) == static_cast<unsigned int>(AMD::AMD_MSR::MSR_EFER) && Private->Guest.ControlArea.ExitInfo1)
