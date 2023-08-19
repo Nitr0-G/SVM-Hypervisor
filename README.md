@@ -22,6 +22,10 @@ You can also find some macroses for YMM and XMM push in Simple example
 # Credits
 
 Inspired by:
-https://github.com/Nitr0-G/Kernel-Bridge
-https://github.com/SinaKarvandi/Hypervisor-From-Scratch
-https://rayanfam.com/topics/hypervisor-from-scratch-part-1/
+1)https://github.com/Nitr0-G/Kernel-Bridge
+
+
+2)https://github.com/SinaKarvandi/Hypervisor-From-Scratch
+
+
+3)https://rayanfam.com/topics/hypervisor-from-scratch-part-1/
