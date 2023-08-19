@@ -17,3 +17,5 @@ This is a simple example(https://github.com/Nitr0-G/SVM-Hypervisor/tree/main/exa
 5) In this example there is no example of unloading, but we can call the DevirtualizeAllProcessors method.
 
 We can inject it, for example, through OSR Loader or through my header library https://github.com/Nitr0-G/DriverLoader
+
+You can also find some macroses for YMM and XMM push in Simple example
