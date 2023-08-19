@@ -367,7 +367,7 @@ namespace PhysicalMemory {
     }
 
     _IRQL_requires_max_(APC_LEVEL)
-    extern "C" PVOID64 GetPhysicalAddress(PVOID VirtualAddress, OPTIONAL PEPROCESS Process) {
+    PVOID64 GetPhysicalAddress(PVOID VirtualAddress, OPTIONAL PEPROCESS Process) {
         if (!Process || Process == PsGetCurrentProcess()) {
             return MmIsAddressValid(VirtualAddress)
                 ? reinterpret_cast<PVOID64>(MmGetPhysicalAddress(VirtualAddress).QuadPart)

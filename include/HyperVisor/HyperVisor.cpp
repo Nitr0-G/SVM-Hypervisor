@@ -1,11 +1,5 @@
 #include "HyperVisor.hpp"
 
-unsigned int HyperVisorSvm::RandomNumber()
-{
-    ULONG Seed = KeQueryPerformanceCounter(NULL).LowPart;
-    return RtlRandomEx(&Seed);
-}
-
 PVOID HyperVisorSvm::AllocPhys(
     _In_ SIZE_T Size, 
     _In_ MEMORY_CACHING_TYPE CachingType = MmCached,

@@ -11,18 +11,6 @@
 #include <fltKernel.h>
 #include <intrin.h>
 
-struct GuestContext
-{
-	DWORD64 Rax; DWORD64 Rbx;
-	DWORD64 Rcx; DWORD64 Rdx;
-	DWORD64 Rsi; DWORD64 Rdi;
-	DWORD64 Rbp; DWORD64 R8;
-	DWORD64 R9;	DWORD64 R10;
-	DWORD64 R11; DWORD64 R12;
-	DWORD64 R13; DWORD64 R14;
-	DWORD64 R15;
-};
-
 extern "C" typedef void(*_SvmVmmRun)(
 	_In_ void* InitialVmmStackPointer);
 
@@ -43,8 +31,6 @@ private:
 	CpuVendor GetCpuVendor();
 	bool VirtualizeProcessor();
 	bool DevirtualizeProcessor(__out PVOID& PrivateVmData);
-
-	unsigned int RandomNumber();
 
 	PVOID AllocPhys(
 		_In_ SIZE_T Size,
