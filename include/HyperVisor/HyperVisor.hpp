@@ -23,7 +23,7 @@ enum AmdEnc : unsigned int { AEbx = 'htuA', AEdx = 'itne', AEcx = 'DMAc' };
 enum class CpuVendor { CpuUnknown, CpuIntel, CpuAmd};
 
 // Magic value, defined by hypervisor, triggers #VMEXIT and VMM shutdown:
-constexpr unsigned int HyperSign = 0x940049;
+constexpr unsigned int HyperSign = 0x1EE7C0DE;
 constexpr unsigned int CPUID_VMM_SHUTDOWN = HyperSign;
 
 class HyperVisorSvm {
