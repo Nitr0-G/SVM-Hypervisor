@@ -2,23 +2,6 @@
 
 EXTERN SvmVmexitHandler: PROC
 
-; Store LDTR:
-_sldt PROC PUBLIC
-    sldt WORD PTR [rcx]
-    ret
-_sldt ENDP
-
-; Store TR:
-_str PROC PUBLIC
-    str WORD PTR [rcx]
-    ret
-_str ENDP
-
-__invd PROC PUBLIC
-    invd
-    ret
-__invd ENDP
-
 GPR_CONTEXT_ENTRIES equ 15 ; rax, rbx, rcx, rdx, rsi, rdi, rbp, r8..r15
 GPR_CONTEXT_SIZE    equ GPR_CONTEXT_ENTRIES * sizeof(QWORD)
 XMM_YMM_CONTEXT_ENTRIES equ 16 ; xmm0..xmm15 ymm0..ymm15
@@ -28,7 +11,7 @@ YMM_CONTEXT_SIZE    equ XMM_YMM_CONTEXT_ENTRIES * sizeof(YMMWORD)
 SSE_SUPPORT equ 0
 AVX_SUPPORT equ 0
 
-CPUID_VMM_SHUTDOWN equ 01EE7C0DEh
+CPUID_VMM_SHUTDOWN equ 0940049h
 
 ; Without RSP saving:
 PUSHAQ MACRO
@@ -154,19 +137,6 @@ MULTIPUSH MACRO
     PUSHAQ
     mov rcx, [rsp + GPR_CONTEXT_SIZE + 16] ; RCX -> PRIVATE_VM_DATA* Private
     mov rdx, rsp ; RDX -> Guest context
-
-;    cmp qword ptr [SSE_SUPPORT], 1
-;    jne @SSE_NON_SUPPORT
-
-    ;PUSHAXMM
-    ;mov r8, rsp
-;@SSE_NON_SUPPORT:
-;   cmp qword ptr [AVX_SUPPORT], 1
-;   jne @AVX_NON_SUPPORT
-
-    ;PUSHAYMM
-    ;mov r9, rsp
-;@AVX_NON_SUPPORT:
 ENDM
 
 PROLOGUE MACRO
@@ -221,8 +191,6 @@ VmmLoop:
     sub rsp, 32 ; Homing space for the x64 call convention
     call SvmVmexitHandler ; VMM_STATUS SvmVmexitHandler(PRIVATE_VM_DATA* Private, GuestContext* Context)
     add rsp, 32
-    ;POPAYMM
-    ;POPAXMM
 
     test al, al ; if (!SvmVmexitHandler(...)) break;
     jz VmmExit
