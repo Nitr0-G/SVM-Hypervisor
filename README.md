@@ -20,12 +20,11 @@ We can inject it, for example, through OSR Loader or through my header library h
 
 You can also find some macroses for YMM and XMM push in Simple example
 # Credits
-
 Inspired by:
-1)https://github.com/Nitr0-G/Kernel-Bridge
+1) https://github.com/Nitr0-G/Kernel-Bridge
 
 
-2)https://github.com/SinaKarvandi/Hypervisor-From-Scratch
+2) https://github.com/SinaKarvandi/Hypervisor-From-Scratch
 
 
-3)https://rayanfam.com/topics/hypervisor-from-scratch-part-1/
+3) https://rayanfam.com/topics/hypervisor-from-scratch-part-1/
