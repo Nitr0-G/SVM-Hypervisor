@@ -1,7 +1,7 @@
 #include <ntddk.h>
 
 #include "GuestContext.hpp"
-#include "HyperVisor.hpp"
+#include "include/HyperVisor/HyperVisor.hpp"
 
 HyperVisorSvm objHyperVisorSvm;
 
@@ -14,9 +14,7 @@ void DriverUnload(_In_ PDRIVER_OBJECT DriverObj)
 SVM::PRIVATE_VM_DATA* Interceptions(
 	_Inout_ SVM::PRIVATE_VM_DATA* Private)
 {
-	//Private->Guest.ControlArea.InterceptCpuid = TRUE;
 	Private->Guest.ControlArea.InterceptVmrun = TRUE;
-	//Private->Guest.ControlArea.InterceptExceptions.Bitmap.InterceptionVectorDB = TRUE;
 	Private->Guest.ControlArea.InterceptMsr = TRUE;
 	Private->Guest.ControlArea.MsrpmBasePa = reinterpret_cast<UINT64>(PhysicalMemory::GetPhysicalAddress(&Private->Msrpm));
 
