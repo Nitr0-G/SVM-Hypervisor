@@ -19,3 +19,9 @@ This is a simple example(https://github.com/Nitr0-G/SVM-Hypervisor/tree/main/exa
 We can inject it, for example, through OSR Loader or through my header library https://github.com/Nitr0-G/DriverLoader
 
 You can also find some macroses for YMM and XMM push in Simple example
+# Credits
+
+Inspired by:
+https://github.com/Nitr0-G/Kernel-Bridge
+https://github.com/SinaKarvandi/Hypervisor-From-Scratch
+https://rayanfam.com/topics/hypervisor-from-scratch-part-1/
