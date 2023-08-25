@@ -53,8 +53,6 @@ void ReadIrpBasedBuffer(HANDLE  Device) {
 	REGISTER_EVENT RegisterEvent;
 	UINT32 OperationCode;
 
-	//HANDLE hFile = CreateFileW(L"C:\\Trace.out", GENERIC_ALL, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	//if (hFile == INVALID_HANDLE_VALUE) { printf("CreateFileW failed\n"); return; }
 	printf(" =============================== Kernel-Mode Logs (Driver) ===============================\n");
 	RegisterEvent.hEvent = NULL;
 	RegisterEvent.Type = IRP_BASED;
@@ -107,10 +105,6 @@ void ReadIrpBasedBuffer(HANDLE  Device) {
 					switch (OperationCode)
 					{
 					case OPERATION_LOG_TRACE_MESSAGE:
-						//if (!WriteFile(hFile, OutputBuffer + sizeof(UINT32), strlen(OutputBuffer + sizeof(UINT32)), NULL, NULL))
-						//{	
-						//	printf("WriteFile failed\n"); CloseHandle(hFile); return;
-						//}
 						printf("%s", OutputBuffer + sizeof(UINT32));
 						break;
 					case OPERATION_LOG_NON_IMMEDIATE_MESSAGE:
@@ -127,9 +121,6 @@ void ReadIrpBasedBuffer(HANDLE  Device) {
 						break;
 					case OPERATION_LOG_WARNING_MESSAGE:
 						printf("Warning log (OPERATION_LOG_WARNING_MESSAGE) :\n");
-						printf("%s", OutputBuffer + sizeof(UINT32));
-						break;
-					default:
 						printf("%s", OutputBuffer + sizeof(UINT32));
 						break;
 					}
@@ -157,7 +148,6 @@ void ReadIrpBasedBuffer(HANDLE  Device) {
 		else
 		{
 			// the thread should not work anymore
-			//CloseHandle(hFile);
 			return;
 		}
 	}
