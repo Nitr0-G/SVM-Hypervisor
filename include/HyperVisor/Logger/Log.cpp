@@ -180,7 +180,7 @@ BOOLEAN Log::LogSendMessageToQueue(UINT32 OperationCode, BOOLEAN IsImmediateMess
 
 	if (LogMessage[0] == '\0') { return FALSE; }
 
-	if (IsImmediateMessage) { return LogSendBuffer(OperationCode, LogMessage, WrittenSize); }
+	if (IsImmediateMessage) { BufferIsReady = TRUE; return LogSendBuffer(OperationCode, LogMessage, WrittenSize); }
 	else
 	{
 		if (IsSvmRootMode) { Index = 1; Spinlock.SpinlockLock((LONG*)&SvmRootLoggingLockForNonImmBuffers); }
