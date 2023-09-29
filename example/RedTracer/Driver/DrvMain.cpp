@@ -183,119 +183,115 @@ extern "C" SVM::VMM_STATUS SvmVmexitHandler(
 	}
 	case SVM::SVM_EXIT_CODE::VMEXIT_PUSHF:
 	{
-		if (((RFLAGS)Private->Guest.StateSaveArea.Rflags).Bitmap.Eflags.Bitmap.VM)
-		{
-			KeBugCheck(MANUALLY_INITIATED_CRASH);
-		}
+	if (((RFLAGS)Private->Guest.StateSaveArea.Rflags).Bitmap.Eflags.Bitmap.VM)
+	{
+		KeBugCheck(MANUALLY_INITIATED_CRASH);
+	}
 
-		if (*(uint8_t*)Private->Guest.StateSaveArea.Rip == 0x66)
-		{
-			Private->Guest.StateSaveArea.Rsp -= sizeof(uint16_t);
 
-			*(uint16_t*)Private->Guest.StateSaveArea.Rsp = (uint16_t)(((RFLAGS)Private->Guest.StateSaveArea.Rflags).Value & UINT16_MAX);
-		}
-		else if (Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode)
-		{
-			Private->Guest.StateSaveArea.Rsp -= sizeof(uintptr_t);
-			*(uint64_t*)Private->Guest.StateSaveArea.Rsp = ((RFLAGS)Private->Guest.StateSaveArea.Rflags).Value;
-		}
-		else if (!Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode)
-		{
-			Private->Guest.StateSaveArea.Rsp -= sizeof(uint32_t);
-			uint32_t value = (uint32_t)(((RFLAGS)Private->Guest.StateSaveArea.Rflags).Value & UINT32_MAX);
-			*(uint32_t*)Private->Guest.StateSaveArea.Rsp = value;
-		}
-		//Private->Guest.StateSaveArea.Rsp -= sizeof(uintptr_t);
-		//*(uint64_t*)Private->Guest.StateSaveArea.Rsp = Private->Guest.StateSaveArea.Rflags;
+	Private->Guest.StateSaveArea.Rsp -= sizeof(uint64_t);
+	if (*(uint8_t*)Private->Guest.StateSaveArea.Rip == 0x66)
+	{
+		*(uint16_t*)Private->Guest.StateSaveArea.Rsp = (uint16_t)(((RFLAGS)Private->Guest.StateSaveArea.Rflags).Value & UINT16_MAX);
+	}
+	else if (Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode)
+	{
+		*(uint64_t*)Private->Guest.StateSaveArea.Rsp = ((RFLAGS)Private->Guest.StateSaveArea.Rflags).Value;
+   	}
+	else if (!Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode)
+	{
+		uint32_t value = (uint32_t)(((RFLAGS)Private->Guest.StateSaveArea.Rflags).Value & UINT32_MAX);
+		*(uint32_t*)Private->Guest.StateSaveArea.Rsp = value;
+	}
+	//Private->Guest.StateSaveArea.Rsp -= sizeof(uintptr_t);
+	//*(uint64_t*)Private->Guest.StateSaveArea.Rsp = Private->Guest.StateSaveArea.Rflags;
 
-		/*
-		KdPrint(("PUSHf\n"));
-		if (Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode == 1)
-		{
-			Private->Guest.StateSaveArea.Rsp -= sizeof(uint64_t);
-			*(uint64_t*)Private->Guest.StateSaveArea.Rsp = Private->Guest.StateSaveArea.Rflags;
-			//((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.TF = 0;
-			//((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.IF = 1;
-			//((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.RF = 0;
-			//((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.VM = 0;
-		}
-		else
-		{
-			Private->Guest.StateSaveArea.Rsp -= sizeof(uint32_t);
-			*(uint32_t*)Private->Guest.StateSaveArea.Rsp = ((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Value;
-			//((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.TF = 0;
-			//((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.IF = 1;
-			//((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.RF = 0;
-			//((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.VM = 0;
-		}
-		*/
-		break;
+	/*
+	KdPrint(("PUSHf\n"));
+	if (Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode == 1)
+	{
+		Private->Guest.StateSaveArea.Rsp -= sizeof(uint64_t);
+		*(uint64_t*)Private->Guest.StateSaveArea.Rsp = Private->Guest.StateSaveArea.Rflags;
+		//((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.TF = 0;
+		//((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.IF = 1;
+		//((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.RF = 0;
+		//((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.VM = 0;
+	}
+	else
+	{
+		Private->Guest.StateSaveArea.Rsp -= sizeof(uint32_t);
+		*(uint32_t*)Private->Guest.StateSaveArea.Rsp = ((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Value;
+		//((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.TF = 0;
+		//((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.IF = 1;
+		//((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.RF = 0;
+		//((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.VM = 0;
+	}
+	*/
+	
+	break;
 	}
 	case SVM::SVM_EXIT_CODE::VMEXIT_POPF:
 	{
-		//Private->Guest.StateSaveArea.Rflags = *(uint64_t*)Private->Guest.StateSaveArea.Rsp;
-		//Private->Guest.StateSaveArea.Rsp += sizeof(uint64_t);
+	RFLAGS StackRFlag{0};
+	//uint32_t OperandSize = 0;
 
-		RFLAGS StackRFlag{0};
-		uint32_t OperandSize = 0;
+	if (Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode)
+	{
+		//OperandSize = sizeof(uintptr_t);
+		StackRFlag.Value = *(uint64_t*)Private->Guest.StateSaveArea.Rsp;
+	}
+	else if (!Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode)
+	{
+		//OperandSize = sizeof(uint32_t);
+		StackRFlag.Value = *(uint32_t*)Private->Guest.StateSaveArea.Rsp;
+	}
 
-		if (Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode)
-		{
-			OperandSize = sizeof(uintptr_t);
-			StackRFlag.Value = *(uint64_t*)Private->Guest.StateSaveArea.Rsp;
-		}
-		else if (!Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode)
-		{
-			OperandSize = sizeof(uint32_t);
-			StackRFlag.Value = *(uint32_t*)Private->Guest.StateSaveArea.Rsp;
-		}
+	if (*(uint8_t*)Private->Guest.StateSaveArea.Rip == 0x66)
+	{
+		//OperandSize = sizeof(uint16_t);
+		StackRFlag.Value = *(uint16_t*)Private->Guest.StateSaveArea.Rsp;
+		StackRFlag.Value = (uint16_t)StackRFlag.Value | (StackRFlag.Value & 0xffff0000u);
+	}
+	StackRFlag.Value &= 0x257fd5;
+	((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Value |= (uint32_t)(StackRFlag.Value) | 0x02;
+	Private->Guest.StateSaveArea.Rsp += sizeof(uint64_t);
 
-		if (*(uint8_t*)Private->Guest.StateSaveArea.Rip == 0x66)
-		{
-			OperandSize = sizeof(uint16_t);
-			StackRFlag.Value = *(uint16_t*)Private->Guest.StateSaveArea.Rsp;
-			StackRFlag.Value = (uint16_t)StackRFlag.Value | (StackRFlag.Value & 0xffff0000u);
-		}
-		StackRFlag.Value &= 0x257fd5;
-		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Value |= (uint32_t)(StackRFlag.Value) | 0x02;
-		Private->Guest.StateSaveArea.Rsp += OperandSize;
-
-		/*
-		KdPrint(("POPf\n"));
-		if (Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode == 1)
-		{
-			((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.ZF =
-				((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.ZF;
-			((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.OF = 
-				((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.OF;
-			((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.CF =
-				((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.CF;
-			((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.PF =
-				((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.PF;
-			((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.SF =
-				((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.SF;
-			((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.AF =
-				((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.DF;
-			Private->Guest.StateSaveArea.Rsp += sizeof(uint64_t);
-		}
-		else
-		{
-			((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.ZF =
-				((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.ZF;
-			((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.OF =
-				((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.OF;
-			((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.CF =
-				((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.CF;
-			((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.PF =
-				((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.PF;
-			((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.SF =
-				((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.SF;
-			((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.AF =
-				((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.DF;
-			Private->Guest.StateSaveArea.Rsp += sizeof(uint32_t);
-		}
-		*/
-		break;
+	/*
+	KdPrint(("POPf\n"));
+	if (Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode == 1)
+	{
+		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.ZF =
+			((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.ZF;
+		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.OF = 
+			((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.OF;
+		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.CF =
+			((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.CF;
+		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.PF =
+			((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.PF;
+		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.SF =
+			((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.SF;
+		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.AF =
+			((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.DF;
+		Private->Guest.StateSaveArea.Rsp += sizeof(uint64_t);
+	}
+	else
+	{
+		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.ZF =
+			((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.ZF;
+		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.OF =
+			((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.OF;
+		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.CF =
+			((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.CF;
+		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.PF =
+			((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.PF;
+		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.SF =
+			((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.SF;
+		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.AF =
+			((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.DF;
+		Private->Guest.StateSaveArea.Rsp += sizeof(uint32_t);
+	}
+	*/
+	break;
 	}
 	case SVM::SVM_EXIT_CODE::VMEXIT_EXCP_DB:
 	{
