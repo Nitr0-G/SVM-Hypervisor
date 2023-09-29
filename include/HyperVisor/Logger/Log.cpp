@@ -1,4 +1,4 @@
-#include "LogSpin.hpp"
+#include "Logger.hpp"
 
 #include <ntddk.h>
 #include <cstdarg>
@@ -132,20 +132,21 @@ BOOLEAN Log::LogSendMessageToQueue(UINT32 OperationCode, BOOLEAN IsImmediateMess
 	UINT32 Index;
 	KIRQL OldIRQL;
 	BOOLEAN IsSvmRootMode;
-	int SprintfResult;
+	int SprintfResult = 0;
 	char LogMessage[PacketChunkSize];
 	char TempMessage[PacketChunkSize];
 	char TimeBuffer[20] = { 0 };
 
 	// Set Vmx State
 	// IsSvmRootMode = false;//GuestState[KeGetCurrentProcessorNumber()].IsOnVmxRootMode;
+	
 	IsSvmRootMode = true;
-
+	/*
 	if (ShowCurrentSystemTime)
 	{
 		va_start(ArgList, Fmt);
 
-		SprintfResult = vsprintf_s(TempMessage, PacketChunkSize - 1, Fmt, ArgList);
+		SprintfResult = vsprintf_s(LogMessage, PacketChunkSize - 1, Fmt, ArgList);
 		va_end(ArgList);
 
 		if (SprintfResult == -1) { return FALSE; }
@@ -180,7 +181,12 @@ BOOLEAN Log::LogSendMessageToQueue(UINT32 OperationCode, BOOLEAN IsImmediateMess
 
 	if (LogMessage[0] == '\0') { return FALSE; }
 
-	if (IsImmediateMessage) { BufferIsReady = TRUE; return LogSendBuffer(OperationCode, LogMessage, WrittenSize); }
+	if (IsImmediateMessage) 
+	{ 
+		BufferIsReady = TRUE; 
+		LogSendBuffer(OperationCode, LogMessage, WrittenSize);
+		RtlZeroMemory(LogMessage, sizeof(LogMessage));
+	}
 	else
 	{
 		if (IsSvmRootMode) { Index = 1; Spinlock.SpinlockLock((LONG*)&SvmRootLoggingLockForNonImmBuffers); }
@@ -210,6 +216,8 @@ BOOLEAN Log::LogSendMessageToQueue(UINT32 OperationCode, BOOLEAN IsImmediateMess
 
 		return Result;
 	}
+	*/
+	return 1;
 }
 
 VOID Log::LogNotifyUsermodeCallback(PKDPC Dpc, PVOID DeferredContext, PVOID SystemArgument1, PVOID SystemArgument2)

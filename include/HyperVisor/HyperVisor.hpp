@@ -2,6 +2,7 @@
 #include "CommonTypes/CPUID.hpp"
 #include "CommonTypes/MSR.hpp"
 #include "CommonTypes/Segmentation.hpp"
+#include "CommonTypes/Registers.hpp"
 #include "CommonTypes/SVM.hpp"
 #include "CommonTypes/Exception.hpp"
 #include "CommonTypes/Interrupts.hpp"
