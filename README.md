@@ -1,5 +1,5 @@
 # SVM-Hypervisor
-This is a ring0 header framework in order to simplify the creation of hypervisors on SVM
+This is a ring -1 header framework in order to simplify the creation of hypervisors on SVM
 # Usage example
 This is a simple example(https://github.com/Nitr0-G/SVM-Hypervisor/tree/main/example/Simple%20example) that builds as follows:
 1) Connect the include file Hypervisor.hpp
