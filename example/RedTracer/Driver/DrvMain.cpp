@@ -1,6 +1,7 @@
 #include <ntddk.h>
 
 #include "GuestContext.hpp"
+#include "Zydis/Zydis.h"
 //#include "Logger/LogSpin.hpp"
 #include "include/HyperVisor/HyperVisor.hpp"
 #include "include/HyperVisor/Logger/Logger.hpp"
@@ -54,8 +55,7 @@ SVM::PRIVATE_VM_DATA* Interceptions(
 {
 	Private->Guest.ControlArea.InterceptCpuid = TRUE;
 	Private->Guest.ControlArea.InterceptVmrun = TRUE;
-	Private->Guest.ControlArea.InterceptPushf = TRUE;
-	//Private->Guest.ControlArea.InterceptPopf = TRUE;
+
 	Private->Guest.ControlArea.InterceptExceptions.Bitmap.InterceptionVectorDB = TRUE;
 	Private->Guest.ControlArea.InterceptExceptions.Bitmap.InterceptionVectorBP = TRUE;
 	Private->Guest.ControlArea.InterceptMsr = TRUE;
@@ -75,67 +75,20 @@ void InjectEvent(__out SVM::VMCB* Guest, unsigned char Vector, unsigned char Typ
 	Guest->ControlArea.EventInjection = Event.Value;
 }
 
-void HvSetRflagTrapFlag(_In_ BOOLEAN Set, _In_ SVM::PRIVATE_VM_DATA* Private)
-{
-	RFLAGS Rflags = { 0 }; 
-
-	//
-	// Unset the trap-flag, as we set it before we have to mask it now
-	//
-	Rflags.Value = Private->Guest.StateSaveArea.Rflags;
-
-	Rflags.Bitmap.Eflags.Bitmap.TF = Set;
-
-	Private->Guest.StateSaveArea.Rflags = Rflags.Value;
-}
-
 void VmFuncSetRflagTrapFlag(_In_ BOOLEAN Set, _In_ SVM::PRIVATE_VM_DATA* Private)
 {
-	HvSetRflagTrapFlag(Set, Private);
+	Private->Guest.StateSaveArea.Rflags.Bitmap.Eflags.Bitmap.TF = Set;
 }
 
-void KdOnRegularStepInInstruction(_In_ SVM::PRIVATE_VM_DATA* Private)
-{
-	//RFLAGS Rflags = { 0 };
-
-	//Private->Guest.StateSaveArea.Rflags;
-
-	//Rflags.Value = Private->Guest.StateSaveArea.Rflags;
-
-	//
-	// Adjust RFLAG's trap-flag
-	//
-	VmFuncSetRflagTrapFlag(TRUE, Private);
-	//if (Rflags.Bitmap.Eflags.Bitmap.TF)
-	//{
-	//	VmFuncSetRflagTrapFlag(TRUE, Private);//FALSE
-	//}
-	//else
-	//{
-	//	VmFuncSetRflagTrapFlag(TRUE, Private);
-	//}
-}
-
-void KdOffRegularStepInInstruction(_In_ SVM::PRIVATE_VM_DATA* Private)
-{
-	//RFLAGS Rflags = { 0 };
-
-	//Private->Guest.StateSaveArea.Rflags;
-
-	//Rflags.Value = Private->Guest.StateSaveArea.Rflags;
-
-	VmFuncSetRflagTrapFlag(FALSE, Private);
-}
-
-unsigned char EPBreakpoint; bool BpPass = false;
-//bool Entry = false;
-//extern unsigned char StolenByte;
+bool BpPass = false;
+//ZydisDecoder* DecoderMinimal = nullptr;
+//ZydisDecodedInstruction* Instruction = nullptr;
 
 extern "C" SVM::VMM_STATUS SvmVmexitHandler(
 	_In_ SVM::PRIVATE_VM_DATA* Private,
 	_In_ GuestContext* Context)
 {
-	// Load the host state:
+	// Load the host state:-
 	__svm_vmload(reinterpret_cast<size_t>(Private->VmmStack.Layout.InitialStack.HostVmcbPa));
 	// Restore the guest's RAX that was overwritten by host's RAX on #VMEXIT:
 	Context->Rax = Private->Guest.StateSaveArea.Rax;
@@ -152,7 +105,20 @@ extern "C" SVM::VMM_STATUS SvmVmexitHandler(
 		__cpuidex(Regs.Raw, Function, SubLeaf);
 
 		if (Function == CPUID_VMM_SHUTDOWN) { Status = SVM::VMM_STATUS::VMM_SHUTDOWN; }
-		else 
+		else if (Function == CPUID::Generic::CPUID_EXTENDED_FEATURE_INFORMATION)
+		{
+			constexpr unsigned int CPUID_FN80000001_ECX_HYPERVISOR = (1 << 5) - 1;
+
+			CPUID::FEATURE_INFORMATION RegsFeature = (CPUID::FEATURE_INFORMATION)Regs;
+			//__cpuid(RegsFeature.Regs.Raw, CPUID::Generic::CPUID_EXTENDED_FEATURE_INFORMATION);
+
+			RegsFeature.AMD.ReservedForHvGuestStatus = 0;
+			Context->Rax = RegsFeature.Regs.Regs.Eax;
+			Context->Rbx = RegsFeature.Regs.Regs.Ebx;
+			Context->Rcx = RegsFeature.Regs.Regs.Ecx;
+			Context->Rdx = RegsFeature.Regs.Regs.Edx;
+		}
+		else
 		{
 			Context->Rax = Regs.Regs.Eax;
 			Context->Rbx = Regs.Regs.Ebx;
@@ -181,125 +147,16 @@ extern "C" SVM::VMM_STATUS SvmVmexitHandler(
 		InjectEvent(&Private->Guest, INTERRUPT_VECTOR::GeneralProtection, EXCEPTION_VECTOR::FaultTrapException, 0); // #GP (Vector = 13, Type = Exception)
 		break;
 	}
-	case SVM::SVM_EXIT_CODE::VMEXIT_PUSHF:
-	{
-	if (((RFLAGS)Private->Guest.StateSaveArea.Rflags).Bitmap.Eflags.Bitmap.VM)
-	{
-		KeBugCheck(MANUALLY_INITIATED_CRASH);
-	}
-
-
-	Private->Guest.StateSaveArea.Rsp -= sizeof(uint64_t);
-	if (*(uint8_t*)Private->Guest.StateSaveArea.Rip == 0x66)
-	{
-		*(uint16_t*)Private->Guest.StateSaveArea.Rsp = (uint16_t)(((RFLAGS)Private->Guest.StateSaveArea.Rflags).Value & UINT16_MAX);
-	}
-	else if (Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode)
-	{
-		*(uint64_t*)Private->Guest.StateSaveArea.Rsp = ((RFLAGS)Private->Guest.StateSaveArea.Rflags).Value;
-   	}
-	else if (!Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode)
-	{
-		uint32_t value = (uint32_t)(((RFLAGS)Private->Guest.StateSaveArea.Rflags).Value & UINT32_MAX);
-		*(uint32_t*)Private->Guest.StateSaveArea.Rsp = value;
-	}
-	//Private->Guest.StateSaveArea.Rsp -= sizeof(uintptr_t);
-	//*(uint64_t*)Private->Guest.StateSaveArea.Rsp = Private->Guest.StateSaveArea.Rflags;
-
-	/*
-	KdPrint(("PUSHf\n"));
-	if (Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode == 1)
-	{
-		Private->Guest.StateSaveArea.Rsp -= sizeof(uint64_t);
-		*(uint64_t*)Private->Guest.StateSaveArea.Rsp = Private->Guest.StateSaveArea.Rflags;
-		//((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.TF = 0;
-		//((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.IF = 1;
-		//((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.RF = 0;
-		//((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.VM = 0;
-	}
-	else
-	{
-		Private->Guest.StateSaveArea.Rsp -= sizeof(uint32_t);
-		*(uint32_t*)Private->Guest.StateSaveArea.Rsp = ((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Value;
-		//((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.TF = 0;
-		//((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.IF = 1;
-		//((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.RF = 0;
-		//((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.VM = 0;
-	}
-	*/
-	
-	break;
-	}
-	case SVM::SVM_EXIT_CODE::VMEXIT_POPF:
-	{
-	RFLAGS StackRFlag{0};
-	//uint32_t OperandSize = 0;
-
-	if (Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode)
-	{
-		//OperandSize = sizeof(uintptr_t);
-		StackRFlag.Value = *(uint64_t*)Private->Guest.StateSaveArea.Rsp;
-	}
-	else if (!Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode)
-	{
-		//OperandSize = sizeof(uint32_t);
-		StackRFlag.Value = *(uint32_t*)Private->Guest.StateSaveArea.Rsp;
-	}
-
-	if (*(uint8_t*)Private->Guest.StateSaveArea.Rip == 0x66)
-	{
-		//OperandSize = sizeof(uint16_t);
-		StackRFlag.Value = *(uint16_t*)Private->Guest.StateSaveArea.Rsp;
-		StackRFlag.Value = (uint16_t)StackRFlag.Value | (StackRFlag.Value & 0xffff0000u);
-	}
-	StackRFlag.Value &= 0x257fd5;
-	((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Value |= (uint32_t)(StackRFlag.Value) | 0x02;
-	Private->Guest.StateSaveArea.Rsp += sizeof(uint64_t);
-
-	/*
-	KdPrint(("POPf\n"));
-	if (Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode == 1)
-	{
-		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.ZF =
-			((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.ZF;
-		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.OF = 
-			((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.OF;
-		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.CF =
-			((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.CF;
-		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.PF =
-			((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.PF;
-		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.SF =
-			((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.SF;
-		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.AF =
-			((RFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.Eflags.Bitmap.DF;
-		Private->Guest.StateSaveArea.Rsp += sizeof(uint64_t);
-	}
-	else
-	{
-		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.ZF =
-			((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.ZF;
-		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.OF =
-			((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.OF;
-		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.CF =
-			((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.CF;
-		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.PF =
-			((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.PF;
-		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.SF =
-			((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.SF;
-		((RFLAGS*)Private->Guest.StateSaveArea.Rflags)->Bitmap.Eflags.Bitmap.AF =
-			((EFLAGS*)Private->Guest.StateSaveArea.Rsp)->Bitmap.DF;
-		Private->Guest.StateSaveArea.Rsp += sizeof(uint32_t);
-	}
-	*/
-	break;
-	}
 	case SVM::SVM_EXIT_CODE::VMEXIT_EXCP_DB:
 	{
+		auto VMROOTCR3 = __readcr3();
+		__writecr3(((CR3)Private->Guest.StateSaveArea.Cr3).Value);
+		__invlpg((void*)Private->Guest.StateSaveArea.Rip);
+		__invlpg((void*)Private->Guest.StateSaveArea.Rsp);
 		++CounterOfInstrs;
 		if (Private->Guest.StateSaveArea.Rip != ExitProcesAddr)
 		{
 			VmFuncSetRflagTrapFlag(TRUE, Private);
-
 			//objTrace.TraceRip(Private);
 			objTrace.TraceMnemonic(Private);
 		}
@@ -312,7 +169,64 @@ extern "C" SVM::VMM_STATUS SvmVmexitHandler(
 			KdPrint(("COUNT OF INSTRS: %p\n", CounterOfInstrs));
 			objTrace.TraceMnemonicFinalization();
 		}
+		
+		if (Private->Guest.StateSaveArea.Rip == 0x141B0247C)//0x157884957
+		{
+			KdPrint(("R14 0x141B0247C: %p\n", Context->R14));
+			KdPrint(("ExitProcesAddr!\n"));
+			VmFuncSetRflagTrapFlag(FALSE, Private);
+		
+			//objTrace.TraceRipFinalization();
+			KdPrint(("COUNT OF INSTRS: %p\n", CounterOfInstrs));
+			objTrace.TraceMnemonicFinalization();
+		}
+		
+		/*
+		if ((const void*)Private->Guest.StateSaveArea.Rip != nullptr)
+		{
+			if (Private->Guest.StateSaveArea.Rip < ASLRSystemAddr)
+			{
+				//DbgBreakPoint();
+				//KdPrint(("RIP: %p\n", Private->Guest.StateSaveArea.Rip));
+				//__invlpg((void*)Private->Guest.StateSaveArea.Rsp);
+				ZydisDecoderDecodeInstruction(
+					DecoderMinimal,
+					NULL,
+					(const void*)Private->Guest.StateSaveArea.Rip,
+					ZYDIS_MAX_INSTRUCTION_LENGTH,
+					Instruction);
 
+				if (Instruction->mnemonic == ZYDIS_MNEMONIC_PUSHFQ || Instruction->mnemonic == ZYDIS_MNEMONIC_PUSHF)
+				{
+					Private->Guest.StateSaveArea.Rsp = PushfHandler(
+						Private->Guest.StateSaveArea.Rsp,
+						((CR3)Private->Guest.StateSaveArea.Cr3).Value,
+						Private->Guest.StateSaveArea.Cs.Attrib.Bitmap.LongMode,
+						((RFLAGS)Private->Guest.StateSaveArea.Rflags).Value);
+					if (!Private->Guest.ControlArea.NextRip) { Private->Guest.StateSaveArea.Rip += Instruction->length; }
+					else { Private->Guest.ControlArea.NextRip += Instruction->length; }
+				}
+				else if (Instruction->mnemonic == ZYDIS_MNEMONIC_CPUID)
+				{
+					DbgBreakPoint();
+					KdPrint(("CPUID RIP: %p\n", Private->Guest.StateSaveArea.Rip));
+				}
+				else if (Instruction->mnemonic == ZYDIS_MNEMONIC_RDTSC)
+				{
+					DbgBreakPoint();
+					KdPrint(("RDTSC RIP: %p\n", Private->Guest.StateSaveArea.Rip));
+				}
+				else if (Instruction->mnemonic == ZYDIS_MNEMONIC_RDTSCP)
+				{
+					DbgBreakPoint();
+					KdPrint(("RDTSCP RIP: %p\n", Private->Guest.StateSaveArea.Rip));
+				}
+
+				RtlZeroMemory(Instruction, sizeof(ZydisDecodedInstruction));
+			}
+		}
+		*/
+		__writecr3(VMROOTCR3);
 		if (!Private->Guest.ControlArea.NextRip)
 		{
 			Private->Guest.StateSaveArea.Rax = Context->Rax;
@@ -321,22 +235,11 @@ extern "C" SVM::VMM_STATUS SvmVmexitHandler(
 	}
 	case SVM::SVM_EXIT_CODE::VMEXIT_EXCP_BP:
 	{
+		auto VMROOTCR3 = __readcr3();
 		VmFuncSetRflagTrapFlag(TRUE, Private); BpPass = true;
 		Private->Guest.StateSaveArea.Rax = Context->Rax;
+		__writecr3(VMROOTCR3);
 		return Status;
-		//if (!Entry)
-		//{
-		//	KdOnRegularStepInInstruction(Private); BpPass = true; Entry = true;
-		//	Private->Guest.StateSaveArea.Rax = Context->Rax;
-		//	return Status;
-		//}
-		//else
-		//{
-		//	VmFuncSetRflagTrapFlag(TRUE, Private);
-		//	memcpy((void*)Private->Guest.StateSaveArea.Rip, (const void*)&StolenByte, 1);
-		//	Private->Guest.StateSaveArea.Rax = Context->Rax;
-		//	return Status;
-		//}
 	}
 	}
 	
@@ -362,7 +265,7 @@ extern "C" SVM::VMM_STATUS SvmVmexitHandler(
 		__writemsr(static_cast<unsigned long>(AMD::AMD_MSR::MSR_EFER), Efer.Value);
 
 		// Restoring the EFlags:
-		__writeeflags(Private->Guest.StateSaveArea.Rflags);
+		__writeeflags(Private->Guest.StateSaveArea.Rflags.Value);
 	}
 
 	Private->Guest.StateSaveArea.Rax = Context->Rax;
@@ -428,7 +331,6 @@ NTSTATUS DrvDispatchIoControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 
 	switch (IrpStack->Parameters.DeviceIoControl.IoControlCode)
 	{
-	
 	case IOCTL_REGISTER_EVENT:
 	{
 		if (IrpStack->Parameters.DeviceIoControl.InputBufferLength < SIZEOF_REGISTER_EVENT || Irp->AssociatedIrp.SystemBuffer == NULL) {
@@ -468,6 +370,7 @@ NTSTATUS DrvDispatchIoControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 		//objTrace.AcceptRipMessage(objFile);
 		//objTrace.AcceptMnemonicMessage(objFile);
 		objTrace.AcceptGraphMessage(objFile);
+		//objTrace.AcceptGraphCycleFoldingMessage(objFile);
 		//while (TRUE)
 		//{
 		//	objTrace.AcceptCombineBufferRipMessage(objFile, objTrace.MainBuffer);
@@ -509,21 +412,6 @@ NTSTATUS DrvDispatchIoControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 
 		break;
 	}
-	case IOCTL_EP_BREAKPOINT:
-	{
-		if (IrpStack->Parameters.DeviceIoControl.InputBufferLength < sizeof(unsigned char) || Irp->AssociatedIrp.SystemBuffer == NULL) {
-			Status = STATUS_INVALID_PARAMETER;
-			break;
-		}
-
-		RtlCopyBytes(&EPBreakpoint, Irp->AssociatedIrp.SystemBuffer, sizeof(unsigned char));
-
-		Irp->IoStatus.Information = sizeof(unsigned char);
-		Irp->IoStatus.Status = STATUS_SUCCESS;
-		IoCompleteRequest(Irp, IO_NO_INCREMENT);
-		Status = STATUS_SUCCESS;
-		break;
-	}
 	case IOCTL_PE_ANALYZE:
 	{
 		Funcs = (std::vector<std::pair<ULONG_PTR, const std::string>>*)Irp->AssociatedIrp.SystemBuffer;
@@ -540,6 +428,7 @@ NTSTATUS DrvDispatchIoControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 			}
 		}
 		else { KdPrint(("Funcs is empty or nullptr\n")); }
+
 		Irp->IoStatus.Status = STATUS_SUCCESS;
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
 		Status = STATUS_SUCCESS;
@@ -560,6 +449,29 @@ NTSTATUS DrvClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	return STATUS_SUCCESS;
 }
 
+/*
+bool SvmExitCodesAllocator()
+{
+	DecoderMinimal = (ZydisDecoder*)ExAllocatePoolWithTag(NonPagedPoolNx, sizeof(ZydisDecoder), 'DecM');
+	if (DecoderMinimal != nullptr)
+	{
+		RtlZeroMemory(DecoderMinimal, sizeof(ZydisDecoder));
+		DecoderMinimal->decoder_mode = ZYDIS_DECODER_MODE_MINIMAL;
+		DecoderMinimal->machine_mode = ZYDIS_MACHINE_MODE_LONG_64;
+		DecoderMinimal->stack_width = ZYDIS_STACK_WIDTH_64;
+
+		Instruction = (ZydisDecodedInstruction*)ExAllocatePool(NonPagedPoolNx, sizeof(ZydisDecodedInstruction));
+		if (Instruction != nullptr)
+		{
+			RtlZeroMemory(Instruction, sizeof(ZydisDecodedInstruction));
+		}
+		else { return false; }
+	}
+	else { return false; }
+
+	return true;
+}
+*/
 extern "C" NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegisterPath)
 {
 	UNREFERENCED_PARAMETER(RegisterPath); NTSTATUS Ntstatus = STATUS_SUCCESS;
@@ -567,6 +479,7 @@ extern "C" NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, PUNICODE_STRIN
 
 	if (!objLog.LogInitialize()) { DbgPrint("[*] Log buffer is not initialized !\n"); DbgBreakPoint(); }
 	if (!objTrace.TraceInitializeMnemonic()) { DbgPrint("[*] Trace buffer is not initialized !\n"); DbgBreakPoint(); }
+	//if (!SvmExitCodesAllocator()) { DbgPrint("[*] SvmExitCodesAllocator buffer is not initialized !\n"); DbgBreakPoint(); }
 
 	RtlInitUnicodeString(&DriverName, L"\\Device\\MyHypervisorDevice");
 	RtlInitUnicodeString(&DosDeviceName, L"\\DosDevices\\MyHypervisorDevice");
@@ -575,8 +488,7 @@ extern "C" NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, PUNICODE_STRIN
 	__crt_init();
 	if (Ntstatus == STATUS_SUCCESS)
 	{
-		for (UINT64 Index = 0; Index < IRP_MJ_MAXIMUM_FUNCTION; Index++) 
-		{ DriverObject->MajorFunction[Index] = DrvUnsupported; }
+		for (UINT64 Index = 0; Index < IRP_MJ_MAXIMUM_FUNCTION; Index++) { DriverObject->MajorFunction[Index] = DrvUnsupported; }
 
 		DriverObject->MajorFunction[IRP_MJ_CLOSE] = DrvClose;
 		DriverObject->MajorFunction[IRP_MJ_CREATE] = DrvCreate;
