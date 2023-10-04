@@ -8,11 +8,11 @@
 #include <ntddk.h>
 #include <vector>
 #include <unordered_map>
-#include <map>
+#include <unordered_set>
 
-#define ASLRSystemAddr 0x00007FF000000000
+const UINT64 ASLRSystemAddr = 0x00007FF000000000;
 #define SpaceBar 2
-const int Arcs = 42;
+const int Arcs = 52;
 
 typedef struct {
 	uint64_t first;
@@ -52,12 +52,25 @@ public:
 };
 
 struct Mnemonic {
-	uint8_t Opcodes[ZYDIS_MAX_INSTRUCTION_LENGTH]{};
+	uint8_t Opcodes[ZYDIS_MAX_INSTRUCTION_LENGTH + 1]{};
 	uint64_t Address = 0;
 
 	size_t Length = 0;
 
 	bool Graph = false;
+	bool operator==(const Mnemonic& t) const
+	{
+		return (this->Address == t.Address);
+	}
+};
+
+class MyHashFunction {
+public:
+	// id is returned as hash function
+	size_t operator()(const Mnemonic& t) const
+	{
+		return t.Address;
+	}
 };
 
 class Trace {
@@ -86,9 +99,9 @@ private:
 	std::vector<TraceMessage<uint64_t>> CircleOfRips;
 	std::vector<TraceMessage<Mnemonic>> CircleOfMnemonics;
 
-	Mnemonic MnemonicCreator(_In_ uint64_t Rip);
+	Mnemonic MnemonicCreator(_In_ uint64_t Rip, _In_ SVM::PRIVATE_VM_DATA* Private);
 
-	void CircleOfMnemonicsFiller(_In_ uint64_t Rip);
+	void CircleOfMnemonicsFiller(_In_ uint64_t Rip, _In_ SVM::PRIVATE_VM_DATA* Private);
 	
 	uint64_t TranslateNumber(uint64_t number);
 
@@ -101,6 +114,7 @@ private:
 	void addEdge(uint64_t** _adjList, uint64_t from, uint64_t to, uint64_t* size);
 public:
 	bool Exit = false;
+	bool EoF = false;
 
 	bool TraceInitializeRip();
 	bool TraceInitializeMnemonic();
@@ -108,6 +122,7 @@ public:
 	void AcceptRipMessage(File& objFile);
 	void AcceptMnemonicMessage(File& objFile);
 	void AcceptGraphMessage(File& objFile);
+	void AcceptGraphCycleFoldingMessage(File& objFile);
 
 	void TraceRip(_In_ SVM::PRIVATE_VM_DATA* Private);
 	void TraceMnemonic(_In_ SVM::PRIVATE_VM_DATA* Private);
